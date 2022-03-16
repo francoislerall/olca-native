@@ -1,0 +1,15 @@
+# UMFPACK library load order for Linux x86-x6
+libgcc_s.so.1
+libblastrampoline.so
+libsuitesparseconfig.so.5
+libcolamd.so.2
+libccolamd.so.2
+libamd.so.2
+libstdc++.so.6
+libcamd.so.2
+libcholmod.so.3
+libumfpack.so.5
+libquadmath.so.0
+libgfortran.so.5
+libopenblas64_.so
+libolcar_withumf.so

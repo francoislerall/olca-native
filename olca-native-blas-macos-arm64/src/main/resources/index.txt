@@ -1,0 +1,6 @@
+# BLAS library load order for MacOS ARM64.
+libgcc_s.1.dylib
+libquadmath.0.dylib
+libgfortran.5.dylib
+libopenblas64_.dylib
+libolcar.dylib
