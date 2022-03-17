@@ -6,17 +6,19 @@ import org.openlca.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Provides the Java interface for the native Julia libraries and contains some
+ * Provides the Java interface for the native libraries and contains some
  * utility methods for loading these libraries.
  */
-public final class Julia {
+public final class NativeLib {
 
 	/**
 	 * The version of the native interface that is used.
@@ -31,7 +33,7 @@ public final class Julia {
 	private static final AtomicBoolean _withSparse = new AtomicBoolean(false);
 
 	/**
-	 * Returns true if the Julia libraries with openLCA bindings are loaded.
+	 * Returns true if the native libraries with openLCA bindings are loaded.
 	 */
 	public static boolean isLoaded() {
 		return _loaded.get();
@@ -64,7 +66,7 @@ public final class Julia {
 		var path = Strings.join(
 				List.of("native", VERSION, os, arch),
 				File.separatorChar);
-		var log = LoggerFactory.getLogger(Julia.class);
+		var log = LoggerFactory.getLogger(NativeLib.class);
 		return new File(root, path);
 	}
 
@@ -75,7 +77,7 @@ public final class Julia {
 	public static synchronized boolean load() {
 		if (_loaded.get())
 			return true;
-		var log = LoggerFactory.getLogger(Julia.class);
+		var log = LoggerFactory.getLogger(NativeLib.class);
 		var dir = getDefaultDir();
 		if (!dir.exists()) {
 			if (!dir.mkdirs()) {
@@ -95,20 +97,20 @@ public final class Julia {
 			var arch = System.getProperty("os.arch");
 			var jarPath = "/native/" + OS.get().toString()
 					+ "/" + arch + "/" + lib;
+			log.info("jarpath: {}", jarPath);
 			try {
-				log.info("copyLib({}, {})", jarPath, libFile);
-
 				copyLib(jarPath, libFile);
 			} catch (Exception e) {
 				log.error("failed to extract library " + lib, e);
 				return false;
 			}
 		}
+		log.info("dir in load(): {}", dir);
 		return loadFromDir(dir);
 	}
 
 	private static void copyLib(String jarPath, File file) throws IOException {
-		var is = Julia.class.getResourceAsStream(jarPath);
+		var is = NativeLib.class.getResourceAsStream(jarPath);
 		var os = new FileOutputStream(file);
 		byte[] buf = new byte[1024];
 		int len;
@@ -120,19 +122,19 @@ public final class Julia {
 	}
 
 	/**
-	 * Loads the Julia libraries and openLCA bindings from the given folder. Returns
-	 * true if the libraries could be loaded (at least there should be a `libjolca`
-	 * library in the folder that could be loaded).
+	 * Loads the native libraries and openLCA bindings from the given folder.
+	 * Return true if the libraries could be loaded (at least there should be a
+	 * `libjolca` library in the folder that could be loaded).
 	 */
 	public static boolean loadFromDir(File dir) {
-		Logger log = LoggerFactory.getLogger(Julia.class);
-		log.info("Try to load Julia libs and bindings from {}", dir);
+		Logger log = LoggerFactory.getLogger(NativeLib.class);
+		log.info("Try to load native libs and bindings from {}", dir);
 		if (_loaded.get()) {
-			log.info("Julia libs already loaded; do nothing");
+			log.info("Native libs already loaded; do nothing");
 			return true;
 		}
 		if (dir == null || !dir.exists() || !dir.isDirectory()) {
-			log.warn("{} does not contain the Julia libraries", dir);
+			log.warn("{} does not contain the native libraries", dir);
 			return false;
 		}
 		synchronized (_loaded) {
@@ -158,106 +160,41 @@ public final class Julia {
 				}
 				return true;
 			} catch (Error e) {
-				log.error("Failed to load Julia libs from " + dir, e);
+				log.error("Failed to load native libs from " + dir, e);
 				return false;
 			}
 		}
 	}
 
-	private static String[] libs(LinkOption opt) {
+	private static List<String> libs(LinkOption opt) {
+		var log = LoggerFactory.getLogger(NativeLib.class);
 		if (opt == null || opt == LinkOption.NONE)
 			return null;
 
-		OS os = OS.get();
-
-		if (os == OS.WINDOWS) {
-			if (opt == LinkOption.ALL) {
-				return new String[]{
-						"libsuitesparseconfig.dll",
-						"libamd.dll",
-						"libwinpthread-1.dll",
-						"libgcc_s_seh-1.dll",
-						"libquadmath-0.dll",
-						"libgfortran-5.dll",
-						"libopenblas64_.dll",
-						"libcolamd.dll",
-						"libcamd.dll",
-						"libccolamd.dll",
-						"libcholmod.dll",
-						"libumfpack.dll",
-						"olcar_withumf.dll",
-				};
-			} else {
-				return new String[]{
-						"libwinpthread-1.dll",
-						"libgcc_s_seh-1.dll",
-						"libquadmath-0.dll",
-						"libgfortran-5.dll",
-						"libopenblas64_.dll",
-						"olcar.dll",
-				};
+		var loadIndexURL = NativeLib.class.getResource("index.txt");
+		log.info("loadIndexURL: {}", loadIndexURL);
+		if (loadIndexURL == null) {
+			log.warn("Failed to load the load index URL of the native library.");
+			return null;
+		} else {
+			List<String> loadIndex;
+			try {
+				var loadIndexPath = Paths.get(loadIndexURL.toURI());
+				Charset charset = Charset.defaultCharset();
+				loadIndex = Files.readAllLines(loadIndexPath, charset);
+			} catch (URISyntaxException | IOException e) {
+				log.warn("Failed to load the load index of the native library: {}",
+					e.getMessage());
+				return null;
 			}
-		}
-
-		if (os == OS.LINUX) {
-			if (opt == LinkOption.ALL) {
-				return new String[] {
-					"libgcc_s.so.1",
-					"libblastrampoline.so",
-					"libsuitesparseconfig.so.5",
-					"libcolamd.so.2",
-					"libccolamd.so.2",
-					"libamd.so.2",
-					"libstdc++.so.6",
-					"libcamd.so.2",
-					"libcholmod.so.3",
-					"libumfpack.so.5",
-					"libquadmath.so.0",
-					"libgfortran.so.5",
-					"libopenblas64_.so",
-					"libolcar_withumf.so",
-				};
-			} else {
-				return new String[] {
-					"libgcc_s.so.1",
-					"libquadmath.so.0",
-					"libgfortran.so.5",
-					"libopenblas64_.so",
-					"libolcar.so",
-				};
+			if (loadIndex.isEmpty()) {
+				return null;
 			}
+			return loadIndex;
 		}
-
-		if (os == OS.MAC) {
-			if (opt == LinkOption.ALL) {
-			  	return new String[] {
-					"libgcc_s.1.dylib",
-					"libquadmath.0.dylib",
-					"libgfortran.5.dylib",
-					"libopenblas64_.dylib",
-					"libsuitesparseconfig.5.4.0.dylib",
-					"libamd.2.4.6.dylib",
-					"libccolamd.2.9.6.dylib",
-					"libcolamd.2.9.6.dylib",
-					"libcamd.2.4.6.dylib",
-					"libcholmod.3.0.13.dylib",
-					"libumfpack.5.7.8.dylib",
-					"libolcar_withumf.dylib",
-			  	};
-			} else {
-				return new String[] {
-					"libgcc_s.1.dylib",
-					"libquadmath.0.dylib",
-					"libgfortran.5.dylib",
-					"libopenblas64_.dylib",
-					"libolcar.dylib",
-			  	};
-			}
-		}
-		return null;
 	}
 
-	/**
+			/**
 	 * Searches for the library which can be linked. When there are multiple link
 	 * options it chooses the one with more functions.
 	 */
@@ -265,6 +202,11 @@ public final class Julia {
 		if (dir == null || !dir.exists())
 			return LinkOption.NONE;
 		var files = dir.listFiles();
+		var log = LoggerFactory.getLogger(NativeLib.class);
+		for (File file : files) {
+			log.info("dir.listFiles()[i]: {}", file.toString());
+		}
+
 		if (files == null)
 			return LinkOption.NONE;
 		var opt = LinkOption.NONE;
@@ -383,8 +325,4 @@ public final class Julia {
 
 	public static native void destroySparseFactorization(
 			long factorization);
-
-	public static void main(String[] args) {
-		Julia.load();
-	}
 }
