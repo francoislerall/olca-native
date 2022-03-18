@@ -1,7 +1,5 @@
 import org.junit.Assert;
 import org.junit.Test;
-import org.openlca.nativelib.NativeLib;
-import org.slf4j.LoggerFactory;
 
 public class LibraryDownloadTest {
 
@@ -14,20 +12,8 @@ public class LibraryDownloadTest {
 	@Test
 	public void testFetchSparseLibs() {
 
-		var log = LoggerFactory.getLogger(LibraryDownloadTest.class);
-		log.info(
-			"TestLoader.class.getResource(\"index.txt\"): {}",
-			LibraryDownloadTest.class.getResource("index.txt")
-		);
-
-		// first load the libraries from the jar
-		Assert.assertTrue(NativeLib.load());
-		Assert.assertTrue(NativeLib.isLoaded());
-		Assert.assertFalse(NativeLib.hasSparseLibraries());
-
-		// now fetch the sparse libraries from the web
-		Assert.assertTrue(NativeLib.fetchSparseLibraries());
-		Assert.assertTrue(NativeLib.isLoaded());
-		Assert.assertTrue(NativeLib.hasSparseLibraries());
+			// first load the libraries from the jar
+			Assert.assertTrue(LibraryDownload.loadNativeLib());
+			Assert.assertTrue(LibraryDownload.isLoaded());
 	}
 }
