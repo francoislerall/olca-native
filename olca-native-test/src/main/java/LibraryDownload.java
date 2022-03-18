@@ -25,10 +25,19 @@ public class LibraryDownload {
 				"been loaded.");
 			return false;
 		}
-		var jarDirPath = String.valueOf(
-			LibraryDownload.class.getResource("native")
-		);
-		return NativeLib.load(index, jarDirPath);
+
+		var jarDirURL =  LibraryDownload.class.getResource("native");
+		if (jarDirURL == null) {
+			log.info("No binaries directory was found.");
+			return false;
+		}
+		try {
+			var jarDirPath = Path.of(jarDirURL.toURI()).toString();
+			return NativeLib.load(index, jarDirPath);
+		} catch (URISyntaxException e) {
+			log.info("Failed to open the binaries' directory: {}", e.getMessage());
+			return false;
+		}
 	}
 
 	private static List<String> getIndex() {
@@ -70,7 +79,6 @@ public class LibraryDownload {
 
 	public static boolean isLoaded() {
 		var log = LoggerFactory.getLogger(LibraryDownload.class);
-		log.info("NativeLib.isLoaded(): {}", NativeLib.isLoaded());
 		return NativeLib.isLoaded();
 	}
 }

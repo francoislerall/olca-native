@@ -25,14 +25,14 @@
 		</dependency>
 		<dependency>
 			<groupId>org.openlca</groupId>
-			<artifactId>olca-native-blas-linux-x86_64</artifactId>
+			<artifactId>olca-native-umfpack-linux-x86_64</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 	</dependencies>
 
 	<build>
 		<plugins>
-			<!--Extract olca-native-blas-linux-x86_64's resources-->
+			<!--Extract olca-native-umfpack-linux-x86_64's resources-->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
@@ -45,7 +45,7 @@
 						</goals>
 						<configuration>
 							<includeGroupIds>${project.groupId}</includeGroupIds>
-							<includeArtifactIds>olca-native-blas-linux-x86_64</includeArtifactIds>
+							<includeArtifactIds>olca-native-umfpack-linux-x86_64</includeArtifactIds>
 							<excludeTransitive>true</excludeTransitive>
 							<outputDirectory>${project.build.directory}/classes</outputDirectory>
 							<excludes>org/**,META-INF/**</excludes>

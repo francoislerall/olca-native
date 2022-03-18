@@ -67,7 +67,6 @@ public final class NativeLib {
 				continue;
 			var binaryPath = binaryDir + "/" + lib;
 			try {
-				log.info("Trying to copy binary {} into {}", binaryPath, libFile);
 				copyLib(binaryPath, libFile);
 			} catch (Exception e) {
 				log.error("failed to extract library " + lib, e);
@@ -78,8 +77,7 @@ public final class NativeLib {
 	}
 
 	private static void copyLib(String binaryPath, File file) throws IOException {
-		File binaryFile = new File(binaryPath);
-		try (var is = new FileInputStream(binaryFile);
+		try (var is = new FileInputStream(binaryPath);
 				 var os = new FileOutputStream(file)) {
 			byte[] buf = new byte[1024];
 			int len;
