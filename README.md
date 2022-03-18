@@ -1,5 +1,24 @@
 # olca-native
 
+## Build
+
+```commandline
+mvn install -DskipTests=true
+```
+
+When modifying dependencies of `olca-native-test`, it is necessary to clean the
+target folders with:
+
+```commandline
+mvn clean install -DskipTests=true
+```
+
+## Test
+
+- Remove/Rename `$HOME/openLCA-data-1.4/native/1.1.0/Linux/amd64` folder.
+- Simply run `LibraryDownloadTest.testFetchSparseLibs` function from
+`olca-native-test`.
+
 ## Instructions:
 
 >Next thing (for this week) you could help with is to develop a concept for packaging the native libraries. There are other Maven libraries which package native code where we can learn from (would be good if you could find some examples). I think we should have something like a parent module which contains the general machinery for copying and loading the libraries. Then, there should be a Maven sub-module for each platform we support (win x64, linux x64, macOS x64 + arm64). This sub-module should contain the native libraries and an index file which lists the load-order. For each platform, we need a version with and without UMFPACK support. Then we need to think about how we package the libraries with openLCA... Currently I checked the libraries for win and macOS x64 into the repo via Git LFS (https://github.com/GreenDelta/olca-modules/tree/master/olca-core/src/main/resources/native); they are loaded like this: https://github.com/GreenDelta/olca-modules/blob/master/olca-core/src/main/java/org/openlca/julia/Julia.java#L74
@@ -34,3 +53,4 @@ etc...
 ```
 
 >I think it would be better to do this in a separate repository. I want to deploy the olca-native artifacts independently from the olca-modules. Also, I would like to merge the things from olca-rust into that new repo. And, I think we need some iterations for finding the right design for this. So, better create a fresh repo for this. Thanks
+
