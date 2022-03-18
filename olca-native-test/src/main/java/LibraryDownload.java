@@ -26,14 +26,14 @@ public class LibraryDownload {
 			return false;
 		}
 
-		var jarDirURL =  LibraryDownload.class.getResource("native");
-		if (jarDirURL == null) {
+		var libsDirURL =  LibraryDownload.class.getResource("native");
+		if (libsDirURL == null) {
 			log.info("No binaries directory was found.");
 			return false;
 		}
 		try {
-			var jarDirPath = Path.of(jarDirURL.toURI()).toString();
-			return NativeLib.load(index, jarDirPath);
+			var libsDirPath = Path.of(libsDirURL.toURI()).toString();
+			return NativeLib.load(index, libsDirPath);
 		} catch (URISyntaxException e) {
 			log.info("Failed to open the binaries' directory: {}", e.getMessage());
 			return false;

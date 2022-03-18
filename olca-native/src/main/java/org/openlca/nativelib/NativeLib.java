@@ -49,7 +49,7 @@ public final class NativeLib {
 	 * Tries to load the libraries from the default folder. Returns true if the
 	 * libraries could be loaded or if they were already loaded.
 	 */
-	public static synchronized boolean load(List<String> index, String binaryDir) {
+	public static synchronized boolean load(List<String> index, String libsDirPath) {
 		if (_loaded.get())
 			return true;
 		var log = LoggerFactory.getLogger(NativeLib.class);
@@ -65,9 +65,9 @@ public final class NativeLib {
 			var libFile = new File(dir, lib);
 			if (libFile.exists())
 				continue;
-			var binaryPath = binaryDir + "/" + lib;
+			var libPath = libsDirPath + "/" + lib;
 			try {
-				copyLib(binaryPath, libFile);
+				copyLib(libPath, libFile);
 			} catch (Exception e) {
 				log.error("failed to extract library " + lib, e);
 				return false;
@@ -76,8 +76,8 @@ public final class NativeLib {
 		return loadFromDir(dir, index);
 	}
 
-	private static void copyLib(String binaryPath, File file) throws IOException {
-		try (var is = new FileInputStream(binaryPath);
+	private static void copyLib(String libPath, File file) throws IOException {
+		try (var is = new FileInputStream(libPath);
 				 var os = new FileOutputStream(file)) {
 			byte[] buf = new byte[1024];
 			int len;
