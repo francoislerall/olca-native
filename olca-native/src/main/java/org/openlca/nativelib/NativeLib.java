@@ -7,11 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -25,34 +22,13 @@ public final class NativeLib {
 	 */
 	public static final String VERSION = "1.1.0";
 
-	private enum LinkOption {
-		NONE, BLAS, ALL
-	}
-
 	private static final AtomicBoolean _loaded = new AtomicBoolean(false);
-	private static final AtomicBoolean _withSparse = new AtomicBoolean(false);
 
 	/**
 	 * Returns true if the native libraries with openLCA bindings are loaded.
 	 */
 	public static boolean isLoaded() {
 		return _loaded.get();
-	}
-
-	public static boolean hasSparseLibraries() {
-		return _withSparse.get();
-	}
-
-	public static synchronized boolean fetchSparseLibraries() {
-		if (isLoaded() && hasSparseLibraries())
-			return true;
-		try {
-			new LibraryDownload().run();
-		} catch (Exception e) {
-			return false;
-		}
-		_loaded.set(false);
-		return load();
 	}
 
 	/**
@@ -64,9 +40,8 @@ public final class NativeLib {
 		var arch = System.getProperty("os.arch");
 		var os = OS.get().toString();
 		var path = Strings.join(
-				List.of("native", VERSION, os, arch),
-				File.separatorChar);
-		var log = LoggerFactory.getLogger(NativeLib.class);
+			List.of("native", VERSION, os, arch),
+			File.separatorChar);
 		return new File(root, path);
 	}
 
@@ -74,7 +49,7 @@ public final class NativeLib {
 	 * Tries to load the libraries from the default folder. Returns true if the
 	 * libraries could be loaded or if they were already loaded.
 	 */
-	public static synchronized boolean load() {
+	public static synchronized boolean load(List<String> index, String binaryDir) {
 		if (_loaded.get())
 			return true;
 		var log = LoggerFactory.getLogger(NativeLib.class);
@@ -86,39 +61,32 @@ public final class NativeLib {
 			}
 		}
 
-		// check if our base BLAS libraries are present and
-		// extract them if necessary
-		var blasLibs = libs(LinkOption.BLAS);
-
-		for (var lib : blasLibs) {
+		for (var lib : index) {
 			var libFile = new File(dir, lib);
 			if (libFile.exists())
 				continue;
-			var arch = System.getProperty("os.arch");
-			var jarPath = "/native/" + OS.get().toString()
-					+ "/" + arch + "/" + lib;
-			log.info("jarpath: {}", jarPath);
+			var binaryPath = binaryDir + "/" + lib;
 			try {
-				copyLib(jarPath, libFile);
+				log.info("Trying to copy binary {} into {}", binaryPath, libFile);
+				copyLib(binaryPath, libFile);
 			} catch (Exception e) {
 				log.error("failed to extract library " + lib, e);
 				return false;
 			}
 		}
-		log.info("dir in load(): {}", dir);
-		return loadFromDir(dir);
+		return loadFromDir(dir, index);
 	}
 
-	private static void copyLib(String jarPath, File file) throws IOException {
-		var is = NativeLib.class.getResourceAsStream(jarPath);
-		var os = new FileOutputStream(file);
-		byte[] buf = new byte[1024];
-		int len;
-		while ((len = is.read(buf)) > 0) {
-			os.write(buf, 0, len);
+	private static void copyLib(String binaryPath, File file) throws IOException {
+		File binaryFile = new File(binaryPath);
+		try (var is = new FileInputStream(binaryFile);
+				 var os = new FileOutputStream(file)) {
+			byte[] buf = new byte[1024];
+			int len;
+			while ((len = is.read(buf)) > 0) {
+				os.write(buf, 0, len);
+			}
 		}
-		os.flush();
-		os.close();
 	}
 
 	/**
@@ -126,7 +94,7 @@ public final class NativeLib {
 	 * Return true if the libraries could be loaded (at least there should be a
 	 * `libjolca` library in the folder that could be loaded).
 	 */
-	public static boolean loadFromDir(File dir) {
+	public static boolean loadFromDir(File dir, List<String> index) {
 		Logger log = LoggerFactory.getLogger(NativeLib.class);
 		log.info("Try to load native libs and bindings from {}", dir);
 		if (_loaded.get()) {
@@ -137,90 +105,23 @@ public final class NativeLib {
 			log.warn("{} does not contain the native libraries", dir);
 			return false;
 		}
+
 		synchronized (_loaded) {
 			if (_loaded.get())
 				return true;
 			try {
-				LinkOption opt = linkOption(dir);
-				if (opt == null || opt == LinkOption.NONE) {
-					log.info("No native libraries found");
-					return false;
-				}
-				for (String lib : libs(opt)) {
+				for (String lib : index) {
 					File f = new File(dir, lib);
 					System.load(f.getAbsolutePath());
 					log.info("loaded native library {}", f);
 				}
 				_loaded.set(true);
-				if (opt == LinkOption.ALL) {
-					_withSparse.set(true);
-					log.info("Math libraries loaded with UMFPACK support.");
-				} else {
-					log.info("Math libraries loaded without UMFPACK support.");
-				}
 				return true;
 			} catch (Error e) {
 				log.error("Failed to load native libs from " + dir, e);
 				return false;
 			}
 		}
-	}
-
-	private static List<String> libs(LinkOption opt) {
-		var log = LoggerFactory.getLogger(NativeLib.class);
-		if (opt == null || opt == LinkOption.NONE)
-			return null;
-
-		var loadIndexURL = NativeLib.class.getResource("index.txt");
-		log.info("loadIndexURL: {}", loadIndexURL);
-		if (loadIndexURL == null) {
-			log.warn("Failed to load the load index URL of the native library.");
-			return null;
-		} else {
-			List<String> loadIndex;
-			try {
-				var loadIndexPath = Paths.get(loadIndexURL.toURI());
-				Charset charset = Charset.defaultCharset();
-				loadIndex = Files.readAllLines(loadIndexPath, charset);
-			} catch (URISyntaxException | IOException e) {
-				log.warn("Failed to load the load index of the native library: {}",
-					e.getMessage());
-				return null;
-			}
-			if (loadIndex.isEmpty()) {
-				return null;
-			}
-			return loadIndex;
-		}
-	}
-
-			/**
-	 * Searches for the library which can be linked. When there are multiple link
-	 * options it chooses the one with more functions.
-	 */
-	private static LinkOption linkOption(File dir) {
-		if (dir == null || !dir.exists())
-			return LinkOption.NONE;
-		var files = dir.listFiles();
-		var log = LoggerFactory.getLogger(NativeLib.class);
-		for (File file : files) {
-			log.info("dir.listFiles()[i]: {}", file.toString());
-		}
-
-		if (files == null)
-			return LinkOption.NONE;
-		var opt = LinkOption.NONE;
-		for (File f : files) {
-			if (!f.isFile())
-				continue;
-			if (f.getName().contains("olcar_withumf")) {
-				return LinkOption.ALL;
-			}
-			if (f.getName().contains("olcar")) {
-				opt = LinkOption.BLAS;
-			}
-		}
-		return opt;
 	}
 
 	// BLAS
@@ -237,7 +138,7 @@ public final class NativeLib {
 	 * @param c     [out] matrix C (size = rowsA * colsB)
 	 */
 	public static native void mmult(int rowsA, int colsB, int k,
-									double[] a, double[] b, double[] c);
+																	double[] a, double[] b, double[] c);
 
 	/**
 	 * Matrix-vector multiplication: y:= A * x
@@ -249,7 +150,7 @@ public final class NativeLib {
 	 * @param y     [out] the resulting vector y
 	 */
 	public static native void mvmult(int rowsA, int colsA,
-									 double[] a, double[] x, double[] y);
+																	 double[] a, double[] x, double[] y);
 
 	// LAPACK
 
@@ -279,50 +180,50 @@ public final class NativeLib {
 
 	// UMFPACK
 	public static native void umfSolve(
-			int n,
-			int[] columnPointers,
-			int[] rowIndices,
-			double[] values,
-			double[] demand,
-			double[] result);
+		int n,
+		int[] columnPointers,
+		int[] rowIndices,
+		double[] values,
+		double[] demand,
+		double[] result);
 
 	public static native long umfFactorize(
-			int n,
-			int[] columnPointers,
-			int[] rowIndices,
-			double[] values);
+		int n,
+		int[] columnPointers,
+		int[] rowIndices,
+		double[] values);
 
 	public static native void umfDispose(long pointer);
 
 	public static native long umfSolveFactorized(
-			long pointer,
-			double[] demand,
-			double[] result);
+		long pointer,
+		double[] demand,
+		double[] result);
 
 
 	public static native long createDenseFactorization(
-			int n,
-			double[] matrix);
+		int n,
+		double[] matrix);
 
 	public static native void solveDenseFactorization(
-			long factorization,
-			int columns,
-			double[] b);
+		long factorization,
+		int columns,
+		double[] b);
 
 	public static native void destroyDenseFactorization(
-			long factorization);
+		long factorization);
 
 	public static native long createSparseFactorization(
-			int n,
-			int[] columnPointers,
-			int[] rowIndices,
-			double[] values);
+		int n,
+		int[] columnPointers,
+		int[] rowIndices,
+		double[] values);
 
 	public static native void solveSparseFactorization(
-			long factorization,
-			double[] b,
-			double[] x);
+		long factorization,
+		double[] b,
+		double[] x);
 
 	public static native void destroySparseFactorization(
-			long factorization);
+		long factorization);
 }
