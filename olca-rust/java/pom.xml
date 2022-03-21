@@ -7,11 +7,8 @@
     </properties>
 
     <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.openlca</groupId>
-        <artifactId>olca-nativelib</artifactId>
-        <version>2.0.0</version>
-    </parent>
+    <groupId>org.openlca</groupId>
     <artifactId>olca-rust</artifactId>
+    <version>1.0.0</version>
 
 </project>

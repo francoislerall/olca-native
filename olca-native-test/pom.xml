@@ -11,7 +11,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.openlca</groupId>
-		<artifactId>olca-nativelib</artifactId>
+		<artifactId>olca-native</artifactId>
 		<version>2.0.0</version>
 	</parent>
 
@@ -20,42 +20,14 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.openlca</groupId>
-			<artifactId>olca-native</artifactId>
+			<artifactId>olca-native-umfpack-linux-x86_64</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.openlca</groupId>
-			<artifactId>olca-native-umfpack-linux-x86_64</artifactId>
-			<version>${project.version}</version>
+			<artifactId>olca-nativelib</artifactId>
+			<version>2.0.0</version>
 		</dependency>
 	</dependencies>
-
-	<build>
-		<plugins>
-			<!--Extract olca-native-umfpack-linux-x86_64's resources-->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>unpack</id>
-						<phase>generate-resources</phase>
-						<goals>
-							<goal>unpack-dependencies</goal>
-						</goals>
-						<configuration>
-							<includeGroupIds>${project.groupId}</includeGroupIds>
-							<includeArtifactIds>olca-native-umfpack-linux-x86_64</includeArtifactIds>
-							<excludeTransitive>true</excludeTransitive>
-							<outputDirectory>${project.build.directory}/classes</outputDirectory>
-							<excludes>org/**,META-INF/**</excludes>
-							<overWriteReleases>true</overWriteReleases>
-							<overWriteSnapshots>true</overWriteSnapshots>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-		</plugins>
-	</build>
 
 </project>

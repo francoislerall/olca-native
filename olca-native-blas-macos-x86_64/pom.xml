@@ -11,9 +11,9 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.openlca</groupId>
-		<artifactId>olca-nativelib</artifactId>
+		<artifactId>olca-native</artifactId>
 		<version>2.0.0</version>
 	</parent>
-	<artifactId>olca-native-blas-macos-x64</artifactId>
+	<artifactId>olca-native-blas-macos-x86_64</artifactId>
 
 </project>
