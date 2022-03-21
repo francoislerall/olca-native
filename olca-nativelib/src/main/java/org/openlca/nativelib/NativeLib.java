@@ -49,7 +49,7 @@ public final class NativeLib {
 	 * Tries to load the libraries from the default folder. Returns true if the
 	 * libraries could be loaded or if they were already loaded.
 	 */
-	public static synchronized boolean load(List<String> index, String libsDirPath) {
+	public static synchronized boolean load() {
 		if (_loaded.get())
 			return true;
 		var log = LoggerFactory.getLogger(NativeLib.class);
@@ -61,29 +61,40 @@ public final class NativeLib {
 			}
 		}
 
-		for (var lib : index) {
-			var libFile = new File(dir, lib);
-			if (libFile.exists())
-				continue;
-			var libPath = libsDirPath + "/" + lib;
-			try {
-				copyLib(libPath, libFile);
-			} catch (Exception e) {
-				log.error("failed to extract library " + lib, e);
-				return false;
-			}
+		var indexInputStream = NativeLib.class.getResourceAsStream("index.txt");
+		if (indexInputStream == null) {
+			log.info("No libraries were found in the index file, thus, nothing has " +
+				"been loaded.");
+			return false;
 		}
-		return loadFromDir(dir, index);
+
+		try (var br = new BufferedReader(new InputStreamReader(indexInputStream))) {
+			String lib;
+			while((lib = br.readLine()) != null) {
+				var libFile = new File(dir, lib);
+				if (libFile.exists())
+					continue;
+				try {
+					copyLib(lib, libFile);
+				} catch (Exception e) {
+					log.error("Failed to extract library " + lib, e);
+					return false;
+				}
+			}
+		} catch (IOException e) {
+			log.info("Could not parse the index file with: {}", e.getMessage());
+			return false;
+		}
+		return loadFromDir(dir);
 	}
 
-	private static void copyLib(String libPath, File file) throws IOException {
-		try (var is = new FileInputStream(libPath);
-				 var os = new FileOutputStream(file)) {
-			byte[] buf = new byte[1024];
-			int len;
-			while ((len = is.read(buf)) > 0) {
-				os.write(buf, 0, len);
-			}
+	private static void copyLib(String lib, File file) throws IOException {
+		var is = NativeLib.class.getResourceAsStream(lib);
+		var os = new FileOutputStream(file);
+		byte[] buf = new byte[1024];
+		int len;
+		while ((len = is.read(buf)) > 0) {
+			os.write(buf, 0, len);
 		}
 	}
 
@@ -92,7 +103,7 @@ public final class NativeLib {
 	 * Return true if the libraries could be loaded (at least there should be a
 	 * `libjolca` library in the folder that could be loaded).
 	 */
-	public static boolean loadFromDir(File dir, List<String> index) {
+	public static boolean loadFromDir(File dir) {
 		Logger log = LoggerFactory.getLogger(NativeLib.class);
 		log.info("Try to load native libs and bindings from {}", dir);
 		if (_loaded.get()) {
@@ -107,15 +118,23 @@ public final class NativeLib {
 		synchronized (_loaded) {
 			if (_loaded.get())
 				return true;
-			try {
-				for (String lib : index) {
+			var indexInputStream = NativeLib.class.getResourceAsStream("index.txt");
+			if (indexInputStream == null) {
+				log.info("No libraries were found in the index file, thus, nothing has " +
+					"been loaded.");
+				return false;
+			}
+
+			try (var br = new BufferedReader(new InputStreamReader(indexInputStream))) {
+				String lib;
+				while((lib = br.readLine()) != null) {
 					File f = new File(dir, lib);
 					System.load(f.getAbsolutePath());
-					log.info("loaded native library {}", f);
+					log.info("Loaded native library {}", f);
 				}
 				_loaded.set(true);
 				return true;
-			} catch (Error e) {
+			} catch (Error | IOException e) {
 				log.error("Failed to load native libs from " + dir, e);
 				return false;
 			}
