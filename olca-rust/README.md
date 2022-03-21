@@ -48,6 +48,8 @@ The following commands are currently supported:
 * `dist`: generates the distribution packages
 * `java`: generates the Java code for loading the dependencies in
   the correct order
+* `index`: generates the `index.txt` files in the `umfpack` and `blas` OS
+  submodules.
 * `viz`: prints the dependency graph in dot-format that can be
   visualized with tools like Graphviz/Webgraphviz (like the image above)
 * `clean`: deletes the contents of the `bin` and `dist` folders

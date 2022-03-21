@@ -1,3 +1,4 @@
-linux-julia-lib-dir = /usr/local/julia-1.6.0/lib/julia
-macos-julia-lib-dir = /Applications/Julia-1.5.app/Contents/Resources/julia/lib/julia
-windows-julia-lib-dir = C:\tools\julia\bin
+linux-x86_64-julia-lib-dir = /usr/local/julia-1.6.0/lib/julia
+macos-arm64-julia-lib-dir = /Applications/Julia-1.5.app/Contents/Resources/julia/lib/julia
+macos-x86_64-arm64-julia-lib-dir = /Applications/Julia-1.5.app/Contents/Resources/julia/lib/julia
+win-x86_64-julia-lib-dir = C:\tools\julia\bin

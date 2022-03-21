@@ -4,12 +4,21 @@ import platform
 import subprocess
 import shutil
 import sys
+from enum import Enum
+from pathlib import Path
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+MODULE_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = MODULE_ROOT.parent
 
-OS_MACOS = "macos"
-OS_WINDOWS = "windows"
-OS_LINUX = "linux"
+
+class OS(str, Enum):
+    MACOS_ARM = "macos-arm64"
+    MACOS_X86_64 = "macos-x86_64"
+    WINDOWS = "windows-x86_64"
+    LINUX = "linux-x86_64"
+
+    def __repr__(self):
+        return "OS." + self.name
 
 
 class Node:
@@ -20,24 +29,29 @@ class Node:
         self.deps = []
 
 
-def get_os() -> str:
-    ps = platform.system().lower()
-    if ps == "darwin":
-        return OS_MACOS
-    if ps == "windows":
-        return OS_WINDOWS
-    if ps == "linux":
-        return OS_LINUX
-    sys.exit("unknown platform: " + ps)
+def get_os() -> OS:
+    platform_system = platform.system().lower()
+    if platform_system == "windows":
+        return OS.WINDOWS
+    platform_platform = platform.platform()
+    if platform_system == "linux":
+        return OS.LINUX
+    if platform_system == "darwin":
+        if "arm" in platform_platform:
+            return OS.MACOS_ARM
+        if "x86_64" in platform_platform:
+            return OS.MACOS_X86_64
+
+    sys.exit("unknown platform: " + platform_system)
 
 
 def get_lib_ext() -> str:
     _os = get_os()
-    if _os == OS_LINUX:
+    if _os == OS.LINUX:
         return ".so"
-    if _os == OS_MACOS:
+    if _os == OS.MACOS_X86_64 or _os == OS.MACOS_ARM:
         return ".dylib"
-    if _os == OS_WINDOWS:
+    if _os == OS.WINDOWS:
         return ".dll"
     sys.exit("unknown os: " + _os)
 
@@ -45,7 +59,7 @@ def get_lib_ext() -> str:
 def as_lib(name: str) -> str:
     _os = get_os()
     prefix = ""
-    if _os != OS_WINDOWS:
+    if _os != OS.WINDOWS:
         if not name.startswith("lib"):
             prefix = "lib"
     return prefix + name + get_lib_ext()
@@ -55,9 +69,9 @@ def get_julia_libdir():
     """Read the Julia library path from the config file. """
     _os = get_os()
     libdir = None
-    config = os.path.join(PROJECT_ROOT, "config")
+    config = os.path.join(MODULE_ROOT, "config")
     with open(config, "r", encoding="utf-8") as f:
-        libdir_key = _os + "-julia-lib-dir"
+        libdir_key = _os.value + "-julia-lib-dir"
         for line in f.readlines():
             parts = line.split("=")
             if len(parts) < 2:
@@ -68,7 +82,8 @@ def get_julia_libdir():
             libdir = parts[1].strip()
             break
     if libdir is None:
-        sys.exit("could not read Julia lib folder for OS=%s from config" % _os)
+        sys.exit(
+            "could not read Julia lib folder for OS=%s from config" % _os.value)
     return libdir
 
 
@@ -84,14 +99,14 @@ def get_version():
 def get_deps(lib_file: str, libs: list) -> list:
     _os = get_os()
     cmd = None
-    if _os == OS_MACOS:
+    if _os == OS.MACOS_ARM or OS.MACOS_ARM:
         cmd = ["otool", "-L", lib_file]
-    if _os == OS_WINDOWS:
+    if _os == OS.WINDOWS:
         cmd = ["Dependencies.exe", "-imports", lib_file]
-    if _os == OS_LINUX:
+    if _os == OS.LINUX:
         cmd = ["ldd", lib_file]
     if cmd is None:
-        sys.exit("no deps command for os " + _os)
+        sys.exit("no deps command for os " + _os.value)
 
     # in Python 3.7 we have capture_output and text flags
     # but we make this compatible with Python 3.6 here
@@ -156,7 +171,7 @@ def topo_sort(dag: Node) -> list:
     queue = [dag]
     handled = set()
     while len(queue) != 0:
-        n = queue.pop(0)    # type: Node
+        n = queue.pop(0)  # type: Node
         if n.name in handled:
             continue
         handled.add(n.name)
@@ -197,7 +212,7 @@ def topo_sort(dag: Node) -> list:
 
 
 def viz():
-    wiumf = os.path.join(PROJECT_ROOT, "bin", as_lib("olcar_withumf"))
+    wiumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar_withumf"))
     if not os.path.exists(wiumf):
         sys.exit(wiumf + " does not exist")
     dag = get_dep_dag(wiumf)
@@ -213,12 +228,12 @@ def viz():
 
 def collect() -> list:
     """Collect all dependecies in a list."""
-    wiumf = os.path.join(PROJECT_ROOT, "bin", as_lib("olcar_withumf"))
+    wiumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar_withumf"))
     if not os.path.exists(wiumf):
         sys.exit(wiumf + " does not exist")
     dag = get_dep_dag(wiumf)
     libs = topo_sort(dag).copy()
-    woumf = os.path.join(PROJECT_ROOT, "bin", as_lib("olcar"))
+    woumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar"))
     if not os.path.exists(woumf):
         sys.exit(woumf + " does not exist")
     for lib in topo_sort(get_dep_dag(woumf)):
@@ -227,12 +242,12 @@ def collect() -> list:
     return libs
 
 
-def sync() -> list:
+def sync():
     print("sync libraries with bin folder")
     libs = collect()
     julia_dir = get_julia_libdir()
     for lib in libs:
-        target = os.path.join(PROJECT_ROOT, "bin", lib)
+        target = os.path.join(MODULE_ROOT, "bin", lib)
         if os.path.exists(target):
             print("bin/%s exists" % lib)
             continue
@@ -244,19 +259,19 @@ def sync() -> list:
         print("copied bin/%s" % lib)
 
 
-def dist() -> list:
+def dist():
     print("create the distribution package")
     sync()
 
     shutil.rmtree("dist", ignore_errors=True)
     now = datetime.datetime.now()
     suffix = "_%s_%s_%d-%02d-%02d" % (
-        get_version(), get_os(), now.year, now.month, now.day)
+        get_version(), get_os().value, now.year, now.month, now.day)
 
     # with umfpack
     zip_file = os.path.join("dist", "olcar_withumf" + suffix)
     print("create package " + zip_file)
-    wiumf = os.path.join(PROJECT_ROOT, "bin", as_lib("olcar_withumf"))
+    wiumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar_withumf"))
     libs = topo_sort(get_dep_dag(wiumf))
     os.makedirs("dist/wi_umfpack")
     for lib in libs:
@@ -268,7 +283,7 @@ def dist() -> list:
     # without umfpack
     zip_file = os.path.join("dist", "olcar" + suffix)
     print("create package " + zip_file)
-    woumf = os.path.join(PROJECT_ROOT, "bin", as_lib("olcar"))
+    woumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar"))
     libs = topo_sort(get_dep_dag(woumf))
     os.makedirs("dist/wo_umfpack")
     for lib in libs:
@@ -279,15 +294,9 @@ def dist() -> list:
 
 
 def java():
-    _os = get_os()
-    if _os == OS_LINUX:
-        _os = "OS.LINUX"
-    elif _os == OS_MACOS:
-        _os = "OS.MAC"
-    elif _os == OS_WINDOWS:
-        _os = "OS.WINDOWS"
+    _os = repr(get_os())
 
-    wiumf = os.path.join(PROJECT_ROOT, "bin", as_lib("olcar_withumf"))
+    wiumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar_withumf"))
     libs = topo_sort(get_dep_dag(wiumf))
 
     print("if (os == %s) {" % _os)
@@ -297,7 +306,7 @@ def java():
         print("      \"%s\"," % lib)
     print("    };")
 
-    woumf = os.path.join(PROJECT_ROOT, "bin", as_lib("olcar"))
+    woumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar"))
     libs = topo_sort(get_dep_dag(woumf))
     print("  } else {")
     print("    return new String[] {")
@@ -306,6 +315,31 @@ def java():
     print("    };")
     print("  }")
     print("}")
+
+
+def index():
+    """Create the index.txt file in the os-specific maven submodules."""
+    _os = get_os()
+
+    wiumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar_withumf"))
+    libs = topo_sort(get_dep_dag(wiumf))
+    module_name = 'olca-native-umfpack-' + _os.value
+    index = PROJECT_ROOT / module_name / "src/main/resources/index.txt"
+
+    with open(index, "w") as file:
+        for lib in libs:
+            file.write(lib + "\n")
+    print(f"{index.name} file created in {index.parent}")
+
+    woumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar"))
+    libs = topo_sort(get_dep_dag(woumf))
+    module_name = 'olca-native-blas-' + _os.value
+    index = PROJECT_ROOT / module_name / "src/main/resources/index.txt"
+
+    with open(index, "w") as file:
+        for lib in libs:
+            file.write(lib + "\n")
+    print(f"{index.name} file created in {index.parent}")
 
 
 def clean():
@@ -331,6 +365,8 @@ def main():
         dist()
     elif cmd == "java":
         java()
+    elif cmd == "index":
+        index()
     elif cmd == "clean":
         clean()
 

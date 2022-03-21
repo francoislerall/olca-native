@@ -37,7 +37,6 @@
 	<!--        <url>https://github.com/GreenDelta/olca-nativelib</url>-->
 	<!--    </scm>-->
 
-
 	<developers>
 		<developer>
 			<id>msrocka</id>
@@ -67,12 +66,12 @@
 	<modules>
 		<module>olca-native</module>
 		<module>olca-native-blas-macos-arm64</module>
-		<module>olca-native-blas-macos-x64</module>
+		<module>olca-native-blas-macos-x86_64</module>
 		<module>olca-native-blas-linux-x86_64</module>
 		<module>olca-native-blas-win-x86_64</module>
 		<module>olca-native-test</module>
 		<module>olca-native-umfpack-macos-arm64</module>
-		<module>olca-native-umfpack-macos-x64</module>
+		<module>olca-native-umfpack-macos-x86_64</module>
 		<module>olca-native-umfpack-linux-x86_64</module>
 		<module>olca-native-umfpack-win-x86_64</module>
 	</modules>
