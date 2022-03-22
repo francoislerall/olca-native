@@ -12,5 +12,11 @@
 **/bin/
 *.log
 
+# binary files
+*.dll
+*.so
+*.so.*
+*.dylib
+
 *.*~
 *.DS_Store
