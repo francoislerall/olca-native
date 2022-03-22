@@ -9,6 +9,7 @@ from pathlib import Path
 
 MODULE_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = MODULE_ROOT.parent
+RESSOURCE_SUBPATH = Path("src/main/resources/org/openlca/nativelib")
 
 
 class OS(str, Enum):
@@ -19,6 +20,14 @@ class OS(str, Enum):
 
     def __repr__(self):
         return "OS." + self.name
+
+    def short(self):
+        if self == OS.MACOS_ARM or self == OS.MACOS_X86_64:
+            return "macos"
+        if self == OS.WINDOWS:
+            return "windows"
+        if self == OS.LINUX:
+            return "linux"
 
 
 class Node:
@@ -71,7 +80,7 @@ def get_julia_libdir():
     libdir = None
     config = os.path.join(MODULE_ROOT, "config")
     with open(config, "r", encoding="utf-8") as f:
-        libdir_key = _os.value + "-julia-lib-dir"
+        libdir_key = _os.short() + "-julia-lib-dir"
         for line in f.readlines():
             parts = line.split("=")
             if len(parts) < 2:
@@ -164,7 +173,7 @@ def get_dep_dag(entry: str) -> Node:
 
 
 def topo_sort(dag: Node) -> list:
-    """Creates a topological order of the nodes dependency DAG in increasing
+    """Creates a topological order of the nodes' dependency DAG in increasing
        dependency order."""
     in_degrees = {}
     dependents = {}
@@ -227,7 +236,7 @@ def viz():
 
 
 def collect() -> list:
-    """Collect all dependecies in a list."""
+    """Collect all dependencies in a list."""
     wiumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar_withumf"))
     if not os.path.exists(wiumf):
         sys.exit(wiumf + " does not exist")
@@ -243,20 +252,21 @@ def collect() -> list:
 
 
 def sync():
-    print("sync libraries with bin folder")
+    print("Sync libraries with the corresponding submodules.")
     libs = collect()
     julia_dir = get_julia_libdir()
     for lib in libs:
-        target = os.path.join(MODULE_ROOT, "bin", lib)
+        module_name = 'olca-native-umfpack-' + get_os().value
+        target = PROJECT_ROOT / module_name / RESSOURCE_SUBPATH / lib
         if os.path.exists(target):
-            print("bin/%s exists" % lib)
+            print(f"Target ({target}) exists")
             continue
         source = os.path.join(julia_dir, lib)
         if not os.path.exists(source):
-            print("ERROR: %s does not exist" % source)
+            print(f"ERROR: {source} does not exist")
             continue
         shutil.copyfile(source, target)
-        print("copied bin/%s" % lib)
+        print(f"copied {target}")
 
 
 def dist():
@@ -324,7 +334,7 @@ def index():
     wiumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar_withumf"))
     libs = topo_sort(get_dep_dag(wiumf))
     module_name = 'olca-native-umfpack-' + _os.value
-    index = PROJECT_ROOT / module_name / "src/main/resources/index.txt"
+    index = PROJECT_ROOT / module_name / RESSOURCE_SUBPATH / "index.txt"
 
     with open(index, "w") as file:
         for lib in libs:
@@ -334,7 +344,7 @@ def index():
     woumf = os.path.join(MODULE_ROOT, "bin", as_lib("olcar"))
     libs = topo_sort(get_dep_dag(woumf))
     module_name = 'olca-native-blas-' + _os.value
-    index = PROJECT_ROOT / module_name / "src/main/resources/index.txt"
+    index = PROJECT_ROOT / module_name / RESSOURCE_SUBPATH / "index.txt"
 
     with open(index, "w") as file:
         for lib in libs:

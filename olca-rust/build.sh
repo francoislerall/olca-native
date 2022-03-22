@@ -20,7 +20,7 @@ fi
 cp $LIB "./bin/$DIST"
 
 
-# 2.) build the version without UMFPACK: libolcar_withumf
+# 2.) build the version without UMFPACK: libolcar
 cargo clean
 export RUSTFLAGS="-C target-feature=-crt-static"
 cargo build --release
